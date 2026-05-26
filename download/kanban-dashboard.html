@@ -27,7 +27,6 @@ body { background: #0a0a0f; color: #e2e8f0; overflow-x: hidden; }
 ::-webkit-scrollbar-thumb { background: #00f0ff33; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #00f0ff66; }
 .glow-cyan { box-shadow: 0 0 15px #00f0ff22, 0 0 30px #00f0ff11; }
-.glow-cyan-strong { box-shadow: 0 0 20px #00f0ff44, 0 0 40px #00f0ff22; }
 .card-hover { transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
 .card-hover:hover { transform: translateY(-2px); box-shadow: 0 0 20px #00f0ff33, 0 8px 25px rgba(0,0,0,0.4); }
 .drag-over { background: #00f0ff0d !important; border: 2px dashed #00f0ff44 !important; }
@@ -38,16 +37,22 @@ body { background: #0a0a0f; color: #e2e8f0; overflow-x: hidden; }
 .modal-overlay.active { opacity: 1; pointer-events: all; }
 .pulse-dot { animation: pulse 2s infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-@keyframes fadeInUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-.fade-in-up { animation: fadeInUp 0.4s ease-out forwards; }
 .heat-low { background: linear-gradient(135deg, #22c55e33, #22c55e11); border-left: 3px solid #22c55e; }
 .heat-med { background: linear-gradient(135deg, #eab30833, #eab30811); border-left: 3px solid #eab308; }
 .heat-high { background: linear-gradient(135deg, #ef444433, #ef444411); border-left: 3px solid #ef4444; }
-.tab-active { border-bottom: 2px solid #00f0ff; color: #00f0ff; }
 .gantt-bar { height: 28px; border-radius: 6px; position: relative; overflow: hidden; }
 .gantt-bar::after { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%); animation: shimmer 2s infinite; }
 @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
 .column-header { position: sticky; top: 0; z-index: 10; backdrop-filter: blur(12px); }
+.progress-ring { transform: rotate(-90deg); }
+.typing-dots span { animation: typingBounce 1.4s infinite; display: inline-block; }
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typingBounce { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-4px); } }
+.stat-bar { height: 4px; border-radius: 2px; background: #1a1a2e; overflow: hidden; }
+.stat-bar-fill { height: 100%; border-radius: 2px; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+.insight-card { border-left: 2px solid; transition: all 0.2s; }
+.insight-card:hover { background: rgba(255,255,255,0.02); }
 </style>
 </head>
 <body class="min-h-screen">
@@ -84,18 +89,15 @@ body { background: #0a0a0f; color: #e2e8f0; overflow-x: hidden; }
 <!-- MAIN CONTENT -->
 <div class="px-4 pb-8">
   <div class="max-w-[1800px] mx-auto">
-    <!-- KANBAN VIEW -->
     <div id="kanbanView" class="flex gap-4 overflow-x-auto pb-4" style="min-height:70vh;"></div>
-    <!-- GANTT VIEW -->
     <div id="ganttView" class="hidden"></div>
-    <!-- HEATMAP VIEW -->
     <div id="heatmapView" class="hidden"></div>
   </div>
 </div>
 
-<!-- SIDE PANEL -->
-<div id="sidePanel" class="side-panel fixed top-0 right-0 h-full w-full md:w-[480px] bg-dark-800 border-l border-white/10 z-50 overflow-y-auto">
-  <div class="p-6" id="sidePanelContent"></div>
+<!-- SIDE PANEL — 3 SECTIONS -->
+<div id="sidePanel" class="side-panel fixed top-0 right-0 h-full w-full md:w-[520px] bg-dark-800 border-l border-white/10 z-50 flex flex-col">
+  <div class="flex-1 overflow-y-auto" id="sidePanelContent"></div>
 </div>
 <div id="sidePanelOverlay" class="fixed inset-0 bg-black/40 z-40 hidden" onclick="closeSidePanel()"></div>
 
@@ -151,6 +153,68 @@ const COLUMNS = ['Backlog','Todo','Doing','Review','Done'];
 const COL_COLORS = { Backlog:'#6b7280', Todo:'#3b82f6', Doing:'#f59e0b', Review:'#a855f7', Done:'#22c55e' };
 const COL_ICONS = { Backlog:'📋', Todo:'📌', Doing:'⚡', Review:'🔍', Done:'✅' };
 
+const AGENT_DATA = {
+  p1: { name:'Legit Agent', avatar:'🛡️', status:'active', lastSeen:'2 min ago',
+    insights:[
+      {type:'working', text:'Running batch verification against the updated scam database — 12,847 entries processed, 94.2% match rate', time:'2m ago'},
+      {type:'discovery', text:'Found 3 new scam signature patterns from Southeast Asian markets that overlap with legitimate distributor codes', time:'18m ago'},
+      {type:'idea', text:'Could add a community-reported scam feed to boost detection speed by ~40% before formal DB updates', time:'1h ago'},
+      {type:'blocker', text:'Offline sync conflicts when field agents push updates from low-connectivity zones — needs CRDT-based merge', time:'3h ago'}
+    ]},
+  p2: { name:'Ally Core', avatar:'🧠', status:'active', lastSeen:'5 min ago',
+    insights:[
+      {type:'working', text:'Fine-tuning the local inference pipeline for Mistral-7B — quantized to 4-bit, running at 18 tok/s on M2', time:'5m ago'},
+      {type:'discovery', text:'Plugin sandbox escape vector found in eval() path — patched and added fuzz testing', time:'45m ago'},
+      {type:'idea', text:'Hierarchical context compression could reduce memory usage by 60% for long conversations', time:'2h ago'},
+      {type:'blocker', text:'Federated learning module blocked on GPU memory constraints for on-device training batches >32', time:'4h ago'}
+    ]},
+  p3: { name:'SciBot', avatar:'📈', status:'active', lastSeen:'1 min ago',
+    insights:[
+      {type:'working', text:'Monitoring 3 active arbitrage positions — ETH/BTC spread at 0.12%, estimated profit $340', time:'1m ago'},
+      {type:'discovery', text:'Detected correlation between Korean premium and BTC volatility — potential alpha signal', time:'30m ago'},
+      {type:'idea', text:'Mean-reversion strategy on the 15m timeframe shows 68% win rate in backtests — worth paper trading', time:'1h ago'},
+      {type:'blocker', text:'Regulatory compliance flags for cross-border trades — need jurisdiction-aware routing before mainnet', time:'5h ago'}
+    ]},
+  p4: { name:'Bridge Agent', avatar:'🌉', status:'idle', lastSeen:'15 min ago',
+    insights:[
+      {type:'working', text:'Processing 23 active visa applications — 8 in document review, 15 awaiting embassy scheduling', time:'15m ago'},
+      {type:'discovery', text:'Japan is piloting a digital nomad visa category — could expand our target audience by 35%', time:'2h ago'},
+      {type:'idea', text:'AI-powered document pre-check could catch 80% of common visa application errors before submission', time:'3h ago'},
+      {type:'blocker', text:'Housing API integration stalled — partner endpoint returning 503s since Monday', time:'6h ago'}
+    ]},
+  p5: { name:'QuickBot', avatar:'⚡', status:'active', lastSeen:'3 min ago',
+    insights:[
+      {type:'working', text:'Generated 4 micro-product templates this week — 2 already in deployment pipeline', time:'3m ago'},
+      {type:'discovery', text:'Landing pages with social proof sections convert 2.3x better than feature-only pages', time:'1h ago'},
+      {type:'idea', text:'Auto-A/B test variant generator could spin up 5 landing page variants per product in under a minute', time:'2h ago'},
+      {type:'blocker', text:'LemonSqueezy webhook handler timing out on high-volume billing events', time:'4h ago'}
+    ]},
+  p6: { name:'SaaS Agent', avatar:'🤖', status:'active', lastSeen:'8 min ago',
+    insights:[
+      {type:'working', text:'Orchestrating 12 active worker agents across 3 enterprise accounts — 94% task completion rate', time:'8m ago'},
+      {type:'discovery', text:'Natural language task decomposition works best with max 4 sub-tasks — beyond that, accuracy drops 30%', time:'40m ago'},
+      {type:'idea', text:'Worker composition graph could let users chain agents visually — like a no-code Zapier for AI', time:'3h ago'},
+      {type:'blocker', text:'Enterprise SSO hitting SAML assertion timeout on larger org directories (>10k users)', time:'5h ago'}
+    ]},
+  p7: { name:'Ptah Agent', avatar:'🔧', status:'active', lastSeen:'4 min ago',
+    insights:[
+      {type:'working', text:'Running design token migration tests — 847 components scanned, 23 need manual review', time:'4m ago'},
+      {type:'discovery', text:'WebGPU compute shaders run 3.2x faster than WebGL for the particle system renderer', time:'1h ago'},
+      {type:'idea', text:'AI-powered codemod generator could auto-migrate 80% of v1 API calls to v2 patterns', time:'2h ago'},
+      {type:'blocker', text:'Plugin API versioning conflict — semver range resolution failing on transitive dependencies', time:'6h ago'}
+    ]},
+  p8: { name:'Shisat Agent', avatar:'📊', status:'active', lastSeen:'6 min ago',
+    insights:[
+      {type:'working', text:'Streaming 2.4M events/min through the new Kafka pipeline — p99 latency down to 12ms', time:'6m ago'},
+      {type:'discovery', text:'Anomaly detection caught a 340% spike in query volume from a single tenant — turned out to be a misconfigured cron', time:'50m ago'},
+      {type:'idea', text:'Predictive auto-scaling based on historical query patterns could cut infra costs by 25%', time:'2h ago'},
+      {type:'blocker', text:'Custom report builder export to PDF breaking on tables >500 rows — memory leak in the renderer', time:'4h ago'}
+    ]}
+};
+
+let chatHistories = {};
+Object.keys(AGENT_DATA).forEach(k => { chatHistories[k] = []; });
+
 let projects = [
   { id:'p1', name:'LegitCheck (JIT Check)', desc:'Near-launch PWA scam verifier for real-time product authentication', stage:'Near Launch', timeline:false,
     tasks:[
@@ -184,7 +248,7 @@ let projects = [
   },
   { id:'p4', name:'My Distant Relative', desc:'Alpha-stage Viet-to-Japan relocation and integration program platform', stage:'Alpha', timeline:false,
     tasks:[
-      {id:'t19',title:'Visa document wizard',desc:'Build step-by-step visa application wizard with document checklists specific to Vietnam→Japan pathways',health:'Yellow',due:'2026-06-10',risk:'Med',revenue:'$5k-$20k',column:'Doing'},
+      {id:'t19',title:'Visa document wizard',desc:'Build step-by-step visa application wizard with document checklists specific to Vietnam to Japan pathways',health:'Yellow',due:'2026-06-10',risk:'Med',revenue:'$5k-$20k',column:'Doing'},
       {id:'t20',title:'Language learning module',desc:'Integrate spaced-repetition Japanese language courses tailored for Vietnamese speakers',health:'Green',due:'2026-06-15',risk:'Low',revenue:'$1k-$5k',column:'Todo'},
       {id:'t21',title:'Housing matching engine',desc:'Create housing recommendation system based on budget, commute, and lifestyle preferences',health:'Green',due:'2026-06-20',risk:'Low',revenue:'$5k-$20k',column:'Todo'},
       {id:'t22',title:'Community forum MVP',desc:'Build the community forum for Vietnamese expats in Japan with mentorship matching',health:'Red',due:'2026-06-25',risk:'High',revenue:'$1k-$5k',column:'Backlog'},
@@ -207,7 +271,7 @@ let projects = [
       {id:'t31',title:'Worker orchestration engine',desc:'Build the multi-agent orchestration engine with task queuing, dependency resolution, and parallel execution',health:'Yellow',due:'2026-05-25',risk:'High',revenue:'$100k+',column:'Doing'},
       {id:'t32',title:'Natural language task definition',desc:'Enable users to define complex workflows using natural language with AI-powered task decomposition',health:'Green',due:'2026-06-01',risk:'Med',revenue:'$100k+',column:'Doing'},
       {id:'t33',title:'Worker marketplace',desc:'Create the marketplace for pre-built AI workers with reviews, usage stats, and customization options',health:'Green',due:'2026-06-15',risk:'Low',revenue:'$100k+',column:'Todo'},
-      {id:'t34',title:'Billing & metering system',desc:'Implement usage-based billing with granular metering per AI action, token, and compute minute',health:'Yellow',due:'2026-06-05',risk:'Med',revenue:'$50k-$100k',column:'Review'},
+      {id:'t34',title:'Billing and metering system',desc:'Implement usage-based billing with granular metering per AI action, token, and compute minute',health:'Yellow',due:'2026-06-05',risk:'Med',revenue:'$50k-$100k',column:'Review'},
       {id:'t35',title:'Enterprise SSO integration',desc:'Add SAML/OIDC SSO support for enterprise customers with role-based access control',health:'Red',due:'2026-06-20',risk:'High',revenue:'$50k-$100k',column:'Backlog'},
       {id:'t36',title:'Worker monitoring dashboard',desc:'Ship real-time monitoring with execution logs, performance metrics, and anomaly alerts',health:'Green',due:'2026-05-10',risk:'Low',revenue:'$20k-$50k',column:'Done'}
     ]
@@ -253,34 +317,34 @@ let draggedTaskId = null;
 let draggedFromProject = null;
 let draggedFromColumn = null;
 let nextId = 100;
+let currentSidePanelTask = null;
+let currentSidePanelProject = null;
 
-// ============ RENDER FUNCTIONS ============
-
+// ============ HELPERS ============
 function getProject(id) { return projects.find(p => p.id === id); }
-
 function getCurrentProject() { return getProject(currentProjectId); }
-
-function getAllTasks() {
-  let all = [];
-  projects.forEach(p => p.tasks.forEach(t => all.push({...t, projectName: p.name, projectId: p.id})));
-  return all;
-}
-
+function getAllTasks() { let all = []; projects.forEach(p => p.tasks.forEach(t => all.push({...t, projectName: p.name, projectId: p.id}))); return all; }
 function healthColor(h) { return h==='Green'?'#22c55e':h==='Yellow'?'#eab308':'#ef4444'; }
 function healthBg(h) { return h==='Green'?'bg-green-500/10 text-green-400 border-green-500/30':h==='Yellow'?'bg-yellow-500/10 text-yellow-400 border-yellow-500/30':'bg-red-500/10 text-red-400 border-red-500/30'; }
 function riskClass(r) { return r==='Low'?'heat-low':r==='Med'?'heat-med':'heat-high'; }
 
+function insightIcon(type) {
+  const m = {working:'⚙️',discovery:'💡',idea:'✨',blocker:'🚧',finding:'🔍'};
+  return m[type]||'📌';
+}
+function insightColor(type) {
+  const m = {working:'#00f0ff',discovery:'#a855f7',idea:'#22c55e',blocker:'#ef4444',finding:'#f59e0b'};
+  return m[type]||'#6b7280';
+}
+
+// ============ RENDER BOARD (UNCHANGED) ============
 function renderSummary() {
   const allTasks = getAllTasks();
   const totalTasks = allTasks.length;
   const doneTasks = allTasks.filter(t => t.column==='Done').length;
   const completionPct = totalTasks ? Math.round(doneTasks/totalTasks*100) : 0;
   const blockedItems = allTasks.filter(t => t.health==='Red').length;
-  const upcomingDeadlines = allTasks.filter(t => {
-    const d = new Date(t.due); const now = new Date(); const week = new Date(now.getTime()+7*86400000);
-    return d >= now && d <= week && t.column !== 'Done';
-  }).length;
-
+  const upcomingDeadlines = allTasks.filter(t => { const d = new Date(t.due); const now = new Date(); const week = new Date(now.getTime()+7*86400000); return d >= now && d <= week && t.column !== 'Done'; }).length;
   const cards = [
     {label:'Total Projects',value:projects.length,icon:'📊',color:'from-cyan-500/20 to-blue-500/10',border:'border-cyan-500/20'},
     {label:'Total Tasks',value:totalTasks,icon:'📝',color:'from-purple-500/20 to-pink-500/10',border:'border-purple-500/20'},
@@ -289,55 +353,32 @@ function renderSummary() {
     {label:'Due This Week',value:upcomingDeadlines,icon:'⏰',color:'from-orange-500/20 to-red-500/10',border:'border-orange-500/20'},
     {label:'Blocked Items',value:blockedItems,icon:'🚫',color:'from-red-500/20 to-pink-500/10',border:'border-red-500/20'}
   ];
-
   document.getElementById('summaryDashboard').innerHTML = cards.map(c => `
     <div class="bg-gradient-to-br ${c.color} border ${c.border} rounded-xl p-4 card-hover cursor-default">
-      <div class="flex items-center justify-between mb-2">
-        <span class="text-xs text-gray-400 uppercase tracking-wider">${c.label}</span>
-        <span class="text-lg">${c.icon}</span>
-      </div>
+      <div class="flex items-center justify-between mb-2"><span class="text-xs text-gray-400 uppercase tracking-wider">${c.label}</span><span class="text-lg">${c.icon}</span></div>
       <div class="text-2xl font-bold text-white">${c.value}</div>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
 function renderProjectTabs() {
-  const container = document.getElementById('projectTabs');
-  container.innerHTML = projects.map(p => {
+  document.getElementById('projectTabs').innerHTML = projects.map(p => {
     const active = p.id === currentProjectId;
-    const taskCount = p.tasks.length;
-    const doneCount = p.tasks.filter(t=>t.column==='Done').length;
-    const pct = taskCount ? Math.round(doneCount/taskCount*100) : 0;
-    return `
-      <button onclick="selectProject('${p.id}')" class="flex-shrink-0 px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${active ? 'bg-neon-cyan/15 border border-neon-cyan/30 text-neon-cyan glow-cyan' : 'bg-dark-700/50 border border-white/5 text-gray-400 hover:bg-dark-600/50 hover:text-gray-200'}">
-        <span>${p.name}</span>
-        <span class="text-xs px-1.5 py-0.5 rounded-md ${active ? 'bg-neon-cyan/20 text-neon-cyan' : 'bg-white/5 text-gray-500'}">${pct}%</span>
-      </button>
-    `;
+    const pct = p.tasks.length ? Math.round(p.tasks.filter(t=>t.column==='Done').length/p.tasks.length*100) : 0;
+    return `<button onclick="selectProject('${p.id}')" class="flex-shrink-0 px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${active ? 'bg-neon-cyan/15 border border-neon-cyan/30 text-neon-cyan glow-cyan' : 'bg-dark-700/50 border border-white/5 text-gray-400 hover:bg-dark-600/50 hover:text-gray-200'}"><span>${p.name}</span><span class="text-xs px-1.5 py-0.5 rounded-md ${active ? 'bg-neon-cyan/20 text-neon-cyan' : 'bg-white/5 text-gray-500'}">${pct}%</span></button>`;
   }).join('');
 }
 
 function renderKanban() {
-  const proj = getCurrentProject();
-  if (!proj) return;
-  const container = document.getElementById('kanbanView');
-  container.innerHTML = COLUMNS.map(col => {
+  const proj = getCurrentProject(); if (!proj) return;
+  document.getElementById('kanbanView').innerHTML = COLUMNS.map(col => {
     const tasks = proj.tasks.filter(t => t.column === col);
-    return `
-      <div class="flex-shrink-0 w-[300px] md:w-[320px] flex flex-col" ondragover="handleDragOver(event)" ondrop="handleDrop(event,'${col}')">
-        <div class="column-header flex items-center justify-between px-3 py-2.5 mb-2 rounded-xl bg-dark-800/80 border border-white/5">
-          <div class="flex items-center gap-2">
-            <div class="w-2.5 h-2.5 rounded-full" style="background:${COL_COLORS[col]}"></div>
-            <span class="font-semibold text-sm text-gray-200">${COL_ICONS[col]} ${col}</span>
-            <span class="text-xs bg-white/5 text-gray-500 px-2 py-0.5 rounded-full">${tasks.length}</span>
-          </div>
-          <button onclick="openAddTaskModal('${col}')" class="w-6 h-6 rounded-md bg-white/5 hover:bg-neon-cyan/20 text-gray-500 hover:text-neon-cyan transition flex items-center justify-center text-lg leading-none">+</button>
-        </div>
-        <div class="flex-1 space-y-2 min-h-[100px] p-1 rounded-xl bg-dark-900/30 border border-dashed border-transparent" data-column="${col}" data-project="${proj.id}">
-          ${tasks.map(t => renderCard(t, proj.id)).join('')}
-        </div>
+    return `<div class="flex-shrink-0 w-[300px] md:w-[320px] flex flex-col" ondragover="handleDragOver(event)" ondrop="handleDrop(event,'${col}')">
+      <div class="column-header flex items-center justify-between px-3 py-2.5 mb-2 rounded-xl bg-dark-800/80 border border-white/5">
+        <div class="flex items-center gap-2"><div class="w-2.5 h-2.5 rounded-full" style="background:${COL_COLORS[col]}"></div><span class="font-semibold text-sm text-gray-200">${COL_ICONS[col]} ${col}</span><span class="text-xs bg-white/5 text-gray-500 px-2 py-0.5 rounded-full">${tasks.length}</span></div>
+        <button onclick="openAddTaskModal('${col}')" class="w-6 h-6 rounded-md bg-white/5 hover:bg-neon-cyan/20 text-gray-500 hover:text-neon-cyan transition flex items-center justify-center text-lg leading-none">+</button>
       </div>
-    `;
+      <div class="flex-1 space-y-2 min-h-[100px] p-1 rounded-xl bg-dark-900/30 border border-dashed border-transparent" data-column="${col}" data-project="${proj.id}">${tasks.map(t => renderCard(t, proj.id)).join('')}</div>
+    </div>`;
   }).join('');
 }
 
@@ -345,412 +386,291 @@ function renderCard(task, projId) {
   const daysLeft = Math.ceil((new Date(task.due) - new Date()) / 86400000);
   const dueLabel = daysLeft < 0 ? `${Math.abs(daysLeft)}d overdue` : daysLeft === 0 ? 'Due today' : `${daysLeft}d left`;
   const dueColor = daysLeft < 0 ? 'text-red-400' : daysLeft <= 3 ? 'text-yellow-400' : 'text-gray-500';
-  return `
-    <div class="bg-dark-700/60 border border-white/5 rounded-xl p-3.5 card-hover cursor-grab active:cursor-grabbing ${riskClass(task.risk)}"
-         draggable="true"
-         data-task-id="${task.id}"
-         data-project-id="${projId}"
-         data-column="${task.column}"
-         ondragstart="handleDragStart(event,'${task.id}','${projId}','${task.column}')"
-         ondragend="handleDragEnd(event)"
-         onclick="openSidePanel('${task.id}','${projId}')">
-      <div class="flex items-start justify-between mb-2">
-        <h4 class="text-sm font-semibold text-gray-100 leading-tight flex-1 pr-2">${task.title}</h4>
-        <div class="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1 ${task.health==='Green'?'bg-green-500':task.health==='Yellow'?'bg-yellow-500 pulse-dot':'bg-red-500 pulse-dot'}" title="${task.health}"></div>
-      </div>
-      <p class="text-xs text-gray-500 mb-3 line-clamp-2">${task.desc}</p>
-      <div class="flex items-center justify-between">
-        <span class="text-xs ${dueColor}">${dueLabel}</span>
-        <div class="flex items-center gap-1.5">
-          <span class="text-[10px] px-1.5 py-0.5 rounded border ${healthBg(task.health)}">${task.health}</span>
-          <span class="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-gray-400 border border-white/10">${task.revenue}</span>
-        </div>
-      </div>
-    </div>
-  `;
+  return `<div class="bg-dark-700/60 border border-white/5 rounded-xl p-3.5 card-hover cursor-grab active:cursor-grabbing ${riskClass(task.risk)}" draggable="true" data-task-id="${task.id}" data-project-id="${projId}" data-column="${task.column}" ondragstart="handleDragStart(event,'${task.id}','${projId}','${task.column}')" ondragend="handleDragEnd(event)" onclick="openSidePanel('${task.id}','${projId}')">
+    <div class="flex items-start justify-between mb-2"><h4 class="text-sm font-semibold text-gray-100 leading-tight flex-1 pr-2">${task.title}</h4><div class="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1 ${task.health==='Green'?'bg-green-500':task.health==='Yellow'?'bg-yellow-500 pulse-dot':'bg-red-500 pulse-dot'}" title="${task.health}"></div></div>
+    <p class="text-xs text-gray-500 mb-3 line-clamp-2">${task.desc}</p>
+    <div class="flex items-center justify-between"><span class="text-xs ${dueColor}">${dueLabel}</span><div class="flex items-center gap-1.5"><span class="text-[10px] px-1.5 py-0.5 rounded border ${healthBg(task.health)}">${task.health}</span><span class="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-gray-400 border border-white/10">${task.revenue}</span></div></div>
+  </div>`;
 }
 
 function renderGantt() {
   const timelineProjects = projects.filter(p => p.timeline);
-  const container = document.getElementById('ganttView');
-
-  const globalStart = new Date('2026-01-01');
-  const globalEnd = new Date('2027-07-01');
-  const totalDays = (globalEnd - globalStart) / 86400000;
-
-  function dateToPercent(dateStr) {
-    const d = new Date(dateStr);
-    return Math.max(0, Math.min(100, ((d - globalStart) / 86400000) / totalDays * 100));
-  }
-
-  container.innerHTML = `
-    <div class="bg-dark-800/50 border border-white/5 rounded-2xl p-6">
-      <h2 class="text-lg font-bold text-neon-cyan mb-6">Timeline View — Ptah Evolution & Shisat Upgrade</h2>
-      <div class="relative">
-        <!-- Month markers -->
-        <div class="flex mb-4 border-b border-white/5 pb-2">
-          ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun'].map((m,i) => `
-            <div class="flex-1 text-[10px] text-gray-600 text-center">${m}</div>
-          `).join('')}
-        </div>
-        ${timelineProjects.map(p => `
-          <div class="mb-8">
-            <h3 class="text-sm font-bold text-gray-200 mb-3 flex items-center gap-2">
-              <span class="w-3 h-3 rounded" style="background:${p.phases[0].color}"></span>
-              ${p.name}
-            </h3>
-            <div class="space-y-2">
-              ${p.phases.map(ph => {
-                const left = dateToPercent(ph.start);
-                const right = dateToPercent(ph.end);
-                const width = right - left;
-                return `
-                  <div class="flex items-center gap-3">
-                    <div class="w-28 text-xs text-gray-400 flex-shrink-0">${ph.name}</div>
-                    <div class="flex-1 relative h-7">
-                      <div class="gantt-bar absolute top-0" style="left:${left}%;width:${width}%;background:${ph.color}33;border:1px solid ${ph.color}66;">
-                        <div class="absolute inset-0 flex items-center px-2 text-[10px] text-white font-medium truncate">${ph.desc}</div>
-                      </div>
-                    </div>
-                  </div>
-                `;
-              }).join('')}
-            </div>
-          </div>
-        `).join('')}
-        <!-- Today marker -->
-        <div class="absolute top-0 bottom-0" style="left:${dateToPercent('2026-05-16')}%;width:2px;background:#00f0ff44;z-index:5;">
-          <div class="absolute -top-1 left-1/2 -translate-x-1/2 text-[9px] text-neon-cyan font-bold bg-dark-800 px-1 rounded">TODAY</div>
-        </div>
-      </div>
-    </div>
-  `;
+  const globalStart = new Date('2026-01-01'), globalEnd = new Date('2027-07-01'), totalDays = (globalEnd - globalStart) / 86400000;
+  function dtp(s) { return Math.max(0, Math.min(100, ((new Date(s) - globalStart) / 86400000) / totalDays * 100)); }
+  document.getElementById('ganttView').innerHTML = `<div class="bg-dark-800/50 border border-white/5 rounded-2xl p-6"><h2 class="text-lg font-bold text-neon-cyan mb-6">Timeline View</h2><div class="relative"><div class="flex mb-4 border-b border-white/5 pb-2">${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun'].map(m=>`<div class="flex-1 text-[10px] text-gray-600 text-center">${m}</div>`).join('')}</div>${timelineProjects.map(p=>`<div class="mb-8"><h3 class="text-sm font-bold text-gray-200 mb-3 flex items-center gap-2"><span class="w-3 h-3 rounded" style="background:${p.phases[0].color}"></span>${p.name}</h3><div class="space-y-2">${p.phases.map(ph=>`<div class="flex items-center gap-3"><div class="w-28 text-xs text-gray-400 flex-shrink-0">${ph.name}</div><div class="flex-1 relative h-7"><div class="gantt-bar absolute top-0" style="left:${dtp(ph.start)}%;width:${dtp(ph.end)-dtp(ph.start)}%;background:${ph.color}33;border:1px solid ${ph.color}66;"><div class="absolute inset-0 flex items-center px-2 text-[10px] text-white font-medium truncate">${ph.desc}</div></div></div></div>`).join('')}</div></div>`).join('')}<div class="absolute top-0 bottom-0" style="left:${dtp('2026-05-19')}%;width:2px;background:#00f0ff44;z-index:5;"><div class="absolute -top-1 left-1/2 -translate-x-1/2 text-[9px] text-neon-cyan font-bold bg-dark-800 px-1 rounded">TODAY</div></div></div></div>`;
 }
 
 function renderHeatmap() {
-  const allTasks = getAllTasks();
-  const container = document.getElementById('heatmapView');
-
-  // Group by project and risk
-  const riskOrder = ['High','Med','Low'];
-  const healthOrder = ['Red','Yellow','Green'];
-
-  const sorted = [...allTasks].sort((a,b) => {
-    const ri = riskOrder.indexOf(a.risk) - riskOrder.indexOf(b.risk);
-    if (ri !== 0) return ri;
-    const hi = healthOrder.indexOf(a.health) - healthOrder.indexOf(b.health);
-    if (hi !== 0) return hi;
-    return new Date(a.due) - new Date(b.due);
-  });
-
-  const highRisk = sorted.filter(t => t.risk === 'High');
-  const medRisk = sorted.filter(t => t.risk === 'Med');
-  const lowRisk = sorted.filter(t => t.risk === 'Low');
-
-  function renderHeatGroup(title, tasks, accentColor) {
-    return `
-      <div class="mb-6">
-        <h3 class="text-sm font-bold mb-3 flex items-center gap-2" style="color:${accentColor}">
-          <div class="w-2 h-2 rounded-full" style="background:${accentColor}"></div>
-          ${title} Risk (${tasks.length} tasks)
-        </h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-          ${tasks.map(t => `
-            <div class="bg-dark-700/40 border border-white/5 rounded-lg p-3 card-hover cursor-pointer" onclick="openSidePanel('${t.id}','${t.projectId}')">
-              <div class="flex items-center justify-between mb-1">
-                <span class="text-xs font-semibold text-gray-200 truncate flex-1 pr-2">${t.title}</span>
-                <div class="w-2 h-2 rounded-full flex-shrink-0" style="background:${healthColor(t.health)}"></div>
-              </div>
-              <div class="text-[10px] text-gray-500 mb-1">${t.projectName}</div>
-              <div class="flex items-center justify-between">
-                <span class="text-[10px] ${t.column==='Done'?'text-green-400':'text-gray-500'}">${t.column}</span>
-                <span class="text-[10px] text-gray-600">${t.due}</span>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    `;
-  }
-
-  // Priority score calculation
-  const scoreMap = {};
-  allTasks.forEach(t => {
-    let score = 0;
-    score += t.risk==='High'?3:t.risk==='Med'?2:1;
-    score += t.health==='Red'?3:t.health==='Yellow'?2:0;
-    const daysLeft = Math.ceil((new Date(t.due)-new Date())/86400000);
-    score += daysLeft < 0 ? 4 : daysLeft <= 3 ? 3 : daysLeft <= 7 ? 2 : 1;
-    score += t.column==='Done'?0:1;
-    scoreMap[t.id] = score;
-  });
-
-  const top5 = [...allTasks].sort((a,b) => scoreMap[b.id]-scoreMap[a.id]).slice(0,5);
-
-  container.innerHTML = `
-    <div class="bg-dark-800/50 border border-white/5 rounded-2xl p-6">
-      <h2 class="text-lg font-bold text-neon-cyan mb-2">Priority Heat Map</h2>
-      <p class="text-xs text-gray-500 mb-6">Tasks sorted by composite priority score (risk + health + urgency)</p>
-
-      <!-- Top 5 Critical -->
-      <div class="mb-6 p-4 rounded-xl bg-red-500/5 border border-red-500/20">
-        <h3 class="text-sm font-bold text-red-400 mb-3 flex items-center gap-2">
-          <span class="text-base">🔥</span> Top 5 Critical Actions
-        </h3>
-        <div class="space-y-2">
-          ${top5.map((t,i) => `
-            <div class="flex items-center gap-3 bg-dark-900/50 rounded-lg p-2.5 cursor-pointer hover:bg-dark-900/80 transition" onclick="openSidePanel('${t.id}','${t.projectId}')">
-              <span class="text-xs font-bold text-red-400 w-5">#${i+1}</span>
-              <div class="flex-1 min-w-0">
-                <div class="text-xs font-semibold text-gray-200 truncate">${t.title}</div>
-                <div class="text-[10px] text-gray-500">${t.projectName}</div>
-              </div>
-              <div class="w-2 h-2 rounded-full" style="background:${healthColor(t.health)}"></div>
-              <span class="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/30">Score: ${scoreMap[t.id]}</span>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-
-      ${renderHeatGroup('High', highRisk, '#ef4444')}
-      ${renderHeatGroup('Medium', medRisk, '#eab308')}
-      ${renderHeatGroup('Low', lowRisk, '#22c55e')}
-    </div>
-  `;
+  const allTasks = getAllTasks(), riskOrder = ['High','Med','Low'];
+  const scoreMap = {}; allTasks.forEach(t => { let s=0; s+=t.risk==='High'?3:t.risk==='Med'?2:1; s+=t.health==='Red'?3:t.health==='Yellow'?2:0; const d=Math.ceil((new Date(t.due)-new Date())/86400000); s+=d<0?4:d<=3?3:d<=7?2:1; s+=t.column==='Done'?0:1; scoreMap[t.id]=s; });
+  const top5 = [...allTasks].sort((a,b)=>scoreMap[b.id]-scoreMap[a.id]).slice(0,5);
+  const rc = {High:'#ef4444',Med:'#eab308',Low:'#22c55e'};
+  function hg(title,tasks,c) { return `<div class="mb-6"><h3 class="text-sm font-bold mb-3 flex items-center gap-2" style="color:${c}"><div class="w-2 h-2 rounded-full" style="background:${c}"></div>${title} Risk (${tasks.length})</h3><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">${tasks.map(t=>`<div class="bg-dark-700/40 border border-white/5 rounded-lg p-3 card-hover cursor-pointer" onclick="openSidePanel('${t.id}','${t.projectId}')"><div class="flex items-center justify-between mb-1"><span class="text-xs font-semibold text-gray-200 truncate flex-1 pr-2">${t.title}</span><div class="w-2 h-2 rounded-full flex-shrink-0" style="background:${healthColor(t.health)}"></div></div><div class="text-[10px] text-gray-500 mb-1">${t.projectName}</div><div class="flex items-center justify-between"><span class="text-[10px] ${t.column==='Done'?'text-green-400':'text-gray-500'}">${t.column}</span><span class="text-[10px] text-gray-600">${t.due}</span></div></div>`).join('')}</div></div>`; }
+  document.getElementById('heatmapView').innerHTML = `<div class="bg-dark-800/50 border border-white/5 rounded-2xl p-6"><h2 class="text-lg font-bold text-neon-cyan mb-2">Priority Heat Map</h2><p class="text-xs text-gray-500 mb-6">Tasks by composite priority score</p><div class="mb-6 p-4 rounded-xl bg-red-500/5 border border-red-500/20"><h3 class="text-sm font-bold text-red-400 mb-3">🔥 Top 5 Critical</h3><div class="space-y-2">${top5.map((t,i)=>`<div class="flex items-center gap-3 bg-dark-900/50 rounded-lg p-2.5 cursor-pointer hover:bg-dark-900/80 transition" onclick="openSidePanel('${t.id}','${t.projectId}')"><span class="text-xs font-bold text-red-400 w-5">#${i+1}</span><div class="flex-1 min-w-0"><div class="text-xs font-semibold text-gray-200 truncate">${t.title}</div><div class="text-[10px] text-gray-500">${t.projectName}</div></div><div class="w-2 h-2 rounded-full" style="background:${healthColor(t.health)}"></div><span class="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/30">${scoreMap[t.id]}</span></div>`).join('')}</div></div>${riskOrder.map(r=>hg(r,allTasks.filter(t=>t.risk===r),rc[r])).join('')}</div>`;
 }
 
 // ============ DRAG & DROP ============
+function handleDragStart(e, taskId, projId, column) { draggedTaskId=taskId; draggedFromProject=projId; draggedFromColumn=column; e.dataTransfer.effectAllowed='move'; e.target.classList.add('dragging'); }
+function handleDragEnd(e) { e.target.classList.remove('dragging'); document.querySelectorAll('.drag-over').forEach(el=>el.classList.remove('drag-over')); draggedTaskId=null; draggedFromProject=null; draggedFromColumn=null; }
+function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect='move'; const col=e.currentTarget.closest('[data-column]'); if(col&&!col.classList.contains('drag-over')){document.querySelectorAll('.drag-over').forEach(el=>el.classList.remove('drag-over'));col.classList.add('drag-over');} }
+function handleDrop(e, targetColumn) { e.preventDefault(); document.querySelectorAll('.drag-over').forEach(el=>el.classList.remove('drag-over')); if(!draggedTaskId||!draggedFromProject)return; const proj=getProject(draggedFromProject); if(!proj)return; const task=proj.tasks.find(t=>t.id===draggedTaskId); if(task&&task.column!==targetColumn){task.column=targetColumn; renderAll();} }
 
-function handleDragStart(e, taskId, projId, column) {
-  draggedTaskId = taskId;
-  draggedFromProject = projId;
-  draggedFromColumn = column;
-  e.dataTransfer.effectAllowed = 'move';
-  e.target.classList.add('dragging');
-}
-
-function handleDragEnd(e) {
-  e.target.classList.remove('dragging');
-  document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-  draggedTaskId = null;
-  draggedFromProject = null;
-  draggedFromColumn = null;
-}
-
-function handleDragOver(e) {
-  e.preventDefault();
-  e.dataTransfer.dropEffect = 'move';
-  const col = e.currentTarget.closest('[data-column]');
-  if (col && !col.classList.contains('drag-over')) {
-    document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-    col.classList.add('drag-over');
-  }
-}
-
-function handleDrop(e, targetColumn) {
-  e.preventDefault();
-  document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-  if (!draggedTaskId || !draggedFromProject) return;
-  const proj = getProject(draggedFromProject);
-  if (!proj) return;
-  const task = proj.tasks.find(t => t.id === draggedTaskId);
-  if (task && task.column !== targetColumn) {
-    task.column = targetColumn;
-    renderAll();
-  }
-}
-
-// ============ SIDE PANEL ============
-
+// ============ SIDE PANEL — 3 SECTIONS ============
 function openSidePanel(taskId, projId) {
-  const proj = getProject(projId);
-  if (!proj) return;
-  const task = proj.tasks.find(t => t.id === taskId);
-  if (!task) return;
+  const proj = getProject(projId); if(!proj) return;
+  const task = proj.tasks.find(t => t.id === taskId); if(!task) return;
+  currentSidePanelTask = taskId;
+  currentSidePanelProject = projId;
 
+  const agent = AGENT_DATA[projId] || {name:'Agent',avatar:'🤖',status:'idle',lastSeen:'unknown',insights:[]};
   const daysLeft = Math.ceil((new Date(task.due) - new Date()) / 86400000);
-  const dueLabel = daysLeft < 0 ? `${Math.abs(daysLeft)} days overdue` : daysLeft === 0 ? 'Due today' : `${daysLeft} days remaining`;
+  const dueLabel = daysLeft < 0 ? `${Math.abs(daysLeft)}d overdue` : daysLeft === 0 ? 'Due today' : `${daysLeft}d left`;
+
+  // Project-level stats
+  const totalProj = proj.tasks.length;
+  const doneProj = proj.tasks.filter(t=>t.column==='Done').length;
+  const projPct = totalProj ? Math.round(doneProj/totalProj*100) : 0;
+  const blockedProj = proj.tasks.filter(t=>t.health==='Red').length;
+  const atRiskProj = proj.tasks.filter(t=>t.health==='Yellow').length;
+  const doingTasks = proj.tasks.filter(t=>t.column==='Doing').length;
+  const inReview = proj.tasks.filter(t=>t.column==='Review').length;
+
+  // SVG progress ring
+  const radius = 28, circ = 2 * Math.PI * radius;
+  const offset = circ - (projPct / 100) * circ;
+
+  const chat = chatHistories[projId] || [];
 
   document.getElementById('sidePanelContent').innerHTML = `
-    <div class="flex items-center justify-between mb-6">
-      <h2 class="text-lg font-bold text-white">Task Details</h2>
-      <button onclick="closeSidePanel()" class="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 flex items-center justify-center transition">✕</button>
-    </div>
-
-    <div class="mb-4">
-      <span class="text-[10px] px-2 py-1 rounded-md bg-neon-cyan/10 text-neon-cyan border border-neon-cyan/20 font-medium">${proj.name}</span>
-    </div>
-
-    <h3 class="text-xl font-bold text-white mb-3">${task.title}</h3>
-    <p class="text-sm text-gray-400 leading-relaxed mb-6">${task.desc}</p>
-
-    <div class="grid grid-cols-2 gap-3 mb-6">
-      <div class="bg-dark-900/50 rounded-xl p-3 border border-white/5">
-        <div class="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Health</div>
+    <!-- HEADER -->
+    <div class="p-5 border-b border-white/5">
+      <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-2">
-          <div class="w-3 h-3 rounded-full" style="background:${healthColor(task.health)}"></div>
-          <span class="text-sm font-semibold" style="color:${healthColor(task.health)}">${task.health}</span>
+          <span class="text-lg">${agent.avatar}</span>
+          <div>
+            <h2 class="text-base font-bold text-white leading-tight">${task.title}</h2>
+            <span class="text-[10px] text-gray-500">${proj.name}</span>
+          </div>
+        </div>
+        <button onclick="closeSidePanel()" class="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 flex items-center justify-center transition text-sm">✕</button>
+      </div>
+      <p class="text-xs text-gray-500 leading-relaxed">${task.desc}</p>
+    </div>
+
+    <!-- SECTION 1: PROJECT STATISTICS -->
+    <div class="p-5 border-b border-white/5">
+      <div class="flex items-center gap-2 mb-4">
+        <div class="w-1 h-4 rounded bg-neon-cyan"></div>
+        <h3 class="text-xs font-bold text-gray-300 uppercase tracking-wider">Project Statistics</h3>
+      </div>
+
+      <div class="flex items-center gap-4 mb-4">
+        <!-- Progress Ring -->
+        <div class="relative flex-shrink-0">
+          <svg width="68" height="68" class="progress-ring">
+            <circle cx="34" cy="34" r="${radius}" stroke="#1a1a2e" stroke-width="5" fill="none"/>
+            <circle cx="34" cy="34" r="${radius}" stroke="${healthColor(task.health)}" stroke-width="5" fill="none" stroke-linecap="round" stroke-dasharray="${circ}" stroke-dashoffset="${offset}" style="transition:stroke-dashoffset 0.6s"/>
+          </svg>
+          <div class="absolute inset-0 flex items-center justify-center">
+            <span class="text-sm font-bold text-white">${projPct}%</span>
+          </div>
+        </div>
+        <div class="flex-1 space-y-1.5">
+          <div class="flex justify-between text-[11px]"><span class="text-gray-500">Status</span><span class="text-white font-medium">${proj.stage}</span></div>
+          <div class="flex justify-between text-[11px]"><span class="text-gray-500">Health</span><span class="font-medium" style="color:${healthColor(task.health)}">${task.health}</span></div>
+          <div class="flex justify-between text-[11px]"><span class="text-gray-500">Due</span><span class="font-medium ${daysLeft<0?'text-red-400':daysLeft<=3?'text-yellow-400':'text-white'}">${dueLabel}</span></div>
         </div>
       </div>
-      <div class="bg-dark-900/50 rounded-xl p-3 border border-white/5">
-        <div class="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Risk Level</div>
-        <span class="text-sm font-semibold ${task.risk==='High'?'text-red-400':task.risk==='Med'?'text-yellow-400':'text-green-400'}">${task.risk} Risk</span>
+
+      <!-- Mini stat bars -->
+      <div class="space-y-2.5">
+        <div>
+          <div class="flex justify-between text-[10px] mb-1"><span class="text-gray-500">Completion</span><span class="text-gray-400">${doneProj}/${totalProj} tasks</span></div>
+          <div class="stat-bar"><div class="stat-bar-fill" style="width:${projPct}%;background:#22c55e"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between text-[10px] mb-1"><span class="text-gray-500">In Progress</span><span class="text-gray-400">${doingTasks} active</span></div>
+          <div class="stat-bar"><div class="stat-bar-fill" style="width:${totalProj?(doingTasks/totalProj*100):0}%;background:#f59e0b"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between text-[10px] mb-1"><span class="text-gray-500">In Review</span><span class="text-gray-400">${inReview} pending</span></div>
+          <div class="stat-bar"><div class="stat-bar-fill" style="width:${totalProj?(inReview/totalProj*100):0}%;background:#a855f7"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between text-[10px] mb-1"><span class="text-gray-500">Blocked</span><span class="text-red-400">${blockedProj} items</span></div>
+          <div class="stat-bar"><div class="stat-bar-fill" style="width:${totalProj?(blockedProj/totalProj*100):0}%;background:#ef4444"></div></div>
+        </div>
       </div>
-      <div class="bg-dark-900/50 rounded-xl p-3 border border-white/5">
-        <div class="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Due Date</div>
-        <div class="text-sm font-semibold ${daysLeft<0?'text-red-400':daysLeft<=3?'text-yellow-400':'text-white'}">${task.due}</div>
-        <div class="text-[10px] ${daysLeft<0?'text-red-400/60':daysLeft<=3?'text-yellow-400/60':'text-gray-600'}">${dueLabel}</div>
+
+      <!-- Risk & Revenue row -->
+      <div class="mt-4 flex gap-2">
+        <div class="flex-1 bg-dark-900/50 rounded-lg p-2.5 border border-white/5">
+          <div class="text-[10px] text-gray-500 mb-0.5">Risk</div>
+          <span class="text-xs font-bold ${task.risk==='High'?'text-red-400':task.risk==='Med'?'text-yellow-400':'text-green-400'}">${task.risk}</span>
+        </div>
+        <div class="flex-1 bg-dark-900/50 rounded-lg p-2.5 border border-white/5">
+          <div class="text-[10px] text-gray-500 mb-0.5">Revenue</div>
+          <span class="text-xs font-bold text-neon-cyan">${task.revenue}</span>
+        </div>
+        <div class="flex-1 bg-dark-900/50 rounded-lg p-2.5 border border-white/5">
+          <div class="text-[10px] text-gray-500 mb-0.5">Est. Complete</div>
+          <span class="text-xs font-bold text-white">${task.due}</span>
+        </div>
       </div>
-      <div class="bg-dark-900/50 rounded-xl p-3 border border-white/5">
-        <div class="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Revenue Potential</div>
-        <span class="text-sm font-semibold text-neon-cyan">${task.revenue}</span>
+
+      <!-- Column quick-move -->
+      <div class="mt-4 flex gap-1">
+        ${COLUMNS.map(col => `<button onclick="moveTask('${task.id}','${projId}','${col}')" class="flex-1 py-1.5 text-[9px] font-medium rounded-md transition ${task.column===col ? 'font-bold' : 'bg-dark-900/50 text-gray-600 hover:text-gray-300'}" style="${task.column===col ? 'background:'+COL_COLORS[col]+'22;color:'+COL_COLORS[col]+';border:1px solid '+COL_COLORS[col]+'44' : ''}">${col}</button>`).join('')}
       </div>
     </div>
 
-    <div class="mb-6">
-      <div class="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Status</div>
-      <div class="flex gap-1">
-        ${COLUMNS.map(col => `
-          <button onclick="moveTask('${task.id}','${projId}','${col}')" class="flex-1 py-2 text-[10px] font-medium rounded-lg transition ${task.column===col ? 'text-white font-bold' : 'bg-dark-900/50 text-gray-500 hover:bg-dark-900/80 hover:text-gray-300'}" style="${task.column===col ? 'background:'+COL_COLORS[col]+'33;border:1px solid '+COL_COLORS[col]+'66;color:'+COL_COLORS[col] : ''}">
-            ${col}
-          </button>
+    <!-- SECTION 2: AI INSIGHTS & UPDATES -->
+    <div class="p-5 border-b border-white/5">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2">
+          <div class="w-1 h-4 rounded bg-neon-purple"></div>
+          <h3 class="text-xs font-bold text-gray-300 uppercase tracking-wider">AI Insights</h3>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <div class="w-1.5 h-1.5 rounded-full ${agent.status==='active'?'bg-green-500':'bg-gray-600'}"></div>
+          <span class="text-[10px] text-gray-500">${agent.name} · ${agent.lastSeen}</span>
+        </div>
+      </div>
+
+      <div class="space-y-2">
+        ${agent.insights.map(ins => `
+          <div class="insight-card rounded-lg p-3 bg-dark-900/30" style="border-left-color:${insightColor(ins.type)}">
+            <div class="flex items-start gap-2">
+              <span class="text-sm mt-0.5 flex-shrink-0">${insightIcon(ins.type)}</span>
+              <div class="flex-1 min-w-0">
+                <div class="text-[11px] text-gray-300 leading-relaxed">${ins.text}</div>
+                <div class="flex items-center gap-2 mt-1.5">
+                  <span class="text-[9px] px-1.5 py-0.5 rounded font-medium" style="background:${insightColor(ins.type)}15;color:${insightColor(ins.type)};border:1px solid ${insightColor(ins.type)}33">${ins.type}</span>
+                  <span class="text-[9px] text-gray-600">${ins.time}</span>
+                </div>
+              </div>
+            </div>
+          </div>
         `).join('')}
       </div>
     </div>
 
-    ${task.risk==='High'?`
-    <div class="p-3 rounded-xl bg-red-500/5 border border-red-500/20 mb-4">
-      <div class="text-xs font-bold text-red-400 mb-1">⚠ High Risk Alert</div>
-      <div class="text-[11px] text-red-300/60">This task has significant risk. Consider breaking it down or assigning additional resources.</div>
-    </div>`:''}
+    <!-- SECTION 3: DIRECT AGENT CHAT -->
+    <div class="p-5 flex flex-col" style="min-height:300px">
+      <div class="flex items-center gap-2 mb-3">
+        <div class="w-1 h-4 rounded bg-neon-green"></div>
+        <h3 class="text-xs font-bold text-gray-300 uppercase tracking-wider">Chat with ${agent.name}</h3>
+      </div>
 
-    ${task.health==='Red'?`
-    <div class="p-3 rounded-xl bg-red-500/5 border border-red-500/20 mb-4">
-      <div class="text-xs font-bold text-red-400 mb-1">🚫 Blocked</div>
-      <div class="text-[11px] text-red-300/60">This task is currently blocked. Resolve blockers before proceeding.</div>
-    </div>`:''}
+      <div id="chatMessages" class="flex-1 space-y-2.5 mb-3 overflow-y-auto max-h-[300px] pr-1">
+        ${chat.length === 0 ? `<div class="text-center py-6"><span class="text-2xl mb-2 block">${agent.avatar}</span><p class="text-[11px] text-gray-600">Message ${agent.name} about this task</p></div>` : chat.map(m => `
+          <div class="${m.role==='user'?'text-right':'text-left'}">
+            <div class="inline-block max-w-[85%] px-3 py-2 rounded-xl text-[11px] leading-relaxed ${m.role==='user'?'bg-neon-cyan/10 text-gray-200 border border-neon-cyan/20':'bg-dark-900/60 text-gray-300 border border-white/5'}">
+              ${m.text}
+            </div>
+          </div>
+        `).join('')}
+      </div>
 
-    <div class="pt-4 border-t border-white/5">
-      <button onclick="deleteTask('${task.id}','${projId}')" class="w-full py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-medium hover:bg-red-500/20 transition">Delete Task</button>
+      <div class="flex gap-2">
+        <input id="chatInput" placeholder="Type a message..." class="flex-1 px-3 py-2 rounded-lg bg-dark-900 border border-white/10 text-white text-xs placeholder-gray-600 focus:border-neon-cyan/40 focus:outline-none" onkeydown="if(event.key==='Enter')sendChat()">
+        <button onclick="sendChat()" class="px-3 py-2 rounded-lg bg-neon-cyan/15 border border-neon-cyan/30 text-neon-cyan text-xs font-medium hover:bg-neon-cyan/25 transition flex-shrink-0">Send</button>
+      </div>
     </div>
   `;
 
   document.getElementById('sidePanel').classList.add('open');
   document.getElementById('sidePanelOverlay').classList.remove('hidden');
+
+  // Scroll chat to bottom
+  setTimeout(() => { const cm = document.getElementById('chatMessages'); if(cm) cm.scrollTop = cm.scrollHeight; }, 50);
 }
 
 function closeSidePanel() {
   document.getElementById('sidePanel').classList.remove('open');
   document.getElementById('sidePanelOverlay').classList.add('hidden');
+  currentSidePanelTask = null;
+  currentSidePanelProject = null;
 }
 
 function moveTask(taskId, projId, newColumn) {
-  const proj = getProject(projId);
-  if (!proj) return;
+  const proj = getProject(projId); if(!proj) return;
   const task = proj.tasks.find(t => t.id === taskId);
-  if (task) {
-    task.column = newColumn;
-    renderAll();
-    openSidePanel(taskId, projId);
-  }
+  if(task) { task.column = newColumn; renderAll(); openSidePanel(taskId, projId); }
 }
 
 function deleteTask(taskId, projId) {
-  const proj = getProject(projId);
-  if (!proj) return;
+  const proj = getProject(projId); if(!proj) return;
   proj.tasks = proj.tasks.filter(t => t.id !== taskId);
-  closeSidePanel();
-  renderAll();
+  closeSidePanel(); renderAll();
+}
+
+function sendChat() {
+  const input = document.getElementById('chatInput');
+  if(!input) return;
+  const text = input.value.trim();
+  if(!text || !currentSidePanelProject) return;
+
+  if(!chatHistories[currentSidePanelProject]) chatHistories[currentSidePanelProject] = [];
+  chatHistories[currentSidePanelProject].push({role:'user', text});
+
+  input.value = '';
+
+  // Re-render chat area
+  const chatArea = document.getElementById('chatMessages');
+  if(chatArea) {
+    chatArea.innerHTML += `<div class="text-right"><div class="inline-block max-w-[85%] px-3 py-2 rounded-xl text-[11px] leading-relaxed bg-neon-cyan/10 text-gray-200 border border-neon-cyan/20">${text}</div></div>`;
+    chatArea.scrollTop = chatArea.scrollHeight;
+  }
+
+  // Simulate agent typing + response
+  setTimeout(() => {
+    if(chatArea) {
+      chatArea.innerHTML += `<div class="text-left" id="agentTyping"><div class="inline-block px-3 py-2 rounded-xl text-[11px] bg-dark-900/60 text-gray-300 border border-white/5"><span class="typing-dots"><span>.</span><span>.</span><span>.</span></span></div></div>`;
+      chatArea.scrollTop = chatArea.scrollHeight;
+    }
+    setTimeout(() => {
+      const agent = AGENT_DATA[currentSidePanelProject];
+      const responses = [
+        `Got it — I'll prioritize that alongside the current ${agent?.name || 'project'} workload. Should have an update within the hour.`,
+        `Noted. I'm already tracking this area closely. Let me dig deeper and report back with specifics.`,
+        `Good call. I'll adjust the approach and flag any blockers I hit. Anything else you want me to focus on?`,
+        `Understood. I'll cross-reference this with the latest data and surface any risks before they escalate.`,
+        `On it. I can see a path forward — let me verify a few things first and I'll ping you with the plan.`
+      ];
+      const resp = responses[Math.floor(Math.random() * responses.length)];
+      chatHistories[currentSidePanelProject].push({role:'agent', text:resp});
+      const typing = document.getElementById('agentTyping');
+      if(typing) typing.remove();
+      if(chatArea) {
+        chatArea.innerHTML += `<div class="text-left"><div class="inline-block max-w-[85%] px-3 py-2 rounded-xl text-[11px] leading-relaxed bg-dark-900/60 text-gray-300 border border-white/5">${resp}</div></div>`;
+        chatArea.scrollTop = chatArea.scrollHeight;
+      }
+    }, 1200 + Math.random() * 800);
+  }, 400);
 }
 
 // ============ MODALS ============
-
-function openAddProjectModal() {
-  document.getElementById('addProjectModal').classList.add('active');
-}
-
-function closeAddProjectModal() {
-  document.getElementById('addProjectModal').classList.remove('active');
-  document.getElementById('newProjName').value = '';
-  document.getElementById('newProjDesc').value = '';
-}
-
-function addProject() {
-  const name = document.getElementById('newProjName').value.trim();
-  const desc = document.getElementById('newProjDesc').value.trim();
-  const stage = document.getElementById('newProjStage').value;
-  if (!name) return;
-  const id = 'p' + (++nextId);
-  projects.push({ id, name, desc: desc || 'New project', stage, timeline: false, tasks: [] });
-  closeAddProjectModal();
-  currentProjectId = id;
-  renderAll();
-}
-
-let addTaskDefaultColumn = 'Backlog';
-
-function openAddTaskModal(column) {
-  addTaskDefaultColumn = column || 'Backlog';
-  document.getElementById('newTaskColumn').value = addTaskDefaultColumn;
-  document.getElementById('addTaskModal').classList.add('active');
-}
-
-function closeAddTaskModal() {
-  document.getElementById('addTaskModal').classList.remove('active');
-  document.getElementById('newTaskTitle').value = '';
-  document.getElementById('newTaskDesc').value = '';
-}
-
-function addTask() {
-  const title = document.getElementById('newTaskTitle').value.trim();
-  const desc = document.getElementById('newTaskDesc').value.trim();
-  const health = document.getElementById('newTaskHealth').value;
-  const due = document.getElementById('newTaskDue').value || '2026-06-15';
-  const risk = document.getElementById('newTaskRisk').value;
-  const revenue = document.getElementById('newTaskRevenue').value;
-  const column = document.getElementById('newTaskColumn').value;
-  if (!title) return;
-  const proj = getCurrentProject();
-  if (!proj) return;
-  const id = 't' + (++nextId);
-  proj.tasks.push({ id, title, desc: desc || 'New task', health, due, risk, revenue, column });
-  closeAddTaskModal();
-  renderAll();
-}
+function openAddProjectModal() { document.getElementById('addProjectModal').classList.add('active'); }
+function closeAddProjectModal() { document.getElementById('addProjectModal').classList.remove('active'); document.getElementById('newProjName').value=''; document.getElementById('newProjDesc').value=''; }
+function addProject() { const n=document.getElementById('newProjName').value.trim(); if(!n)return; const id='p'+(++nextId); projects.push({id,name:n,desc:document.getElementById('newProjDesc').value.trim()||'New project',stage:document.getElementById('newProjStage').value,timeline:false,tasks:[]}); AGENT_DATA[id]={name:n+' Agent',avatar:'🤖',status:'idle',lastSeen:'just now',insights:[]}; chatHistories[id]=[]; closeAddProjectModal(); currentProjectId=id; renderAll(); }
+function openAddTaskModal(column) { document.getElementById('newTaskColumn').value=column; document.getElementById('addTaskModal').classList.add('active'); }
+function closeAddTaskModal() { document.getElementById('addTaskModal').classList.remove('active'); document.getElementById('newTaskTitle').value=''; document.getElementById('newTaskDesc').value=''; }
+function addTask() { const t=document.getElementById('newTaskTitle').value.trim(); if(!t)return; const proj=getCurrentProject(); if(!proj)return; proj.tasks.push({id:'t'+(++nextId),title:t,desc:document.getElementById('newTaskDesc').value.trim()||'New task',health:document.getElementById('newTaskHealth').value,due:document.getElementById('newTaskDue').value||'2026-06-15',risk:document.getElementById('newTaskRisk').value,revenue:document.getElementById('newTaskRevenue').value,column:document.getElementById('newTaskColumn').value}); closeAddTaskModal(); renderAll(); }
 
 // ============ VIEW TOGGLE ============
-
 function toggleView(view) {
-  document.getElementById('kanbanView').classList.toggle('hidden', view !== 'kanban');
-  document.getElementById('ganttView').classList.toggle('hidden', view !== 'gantt');
-  document.getElementById('heatmapView').classList.toggle('hidden', view !== 'heatmap');
-
-  const btnK = document.getElementById('btnKanban');
-  const btnG = document.getElementById('btnGantt');
-  const btnH = document.getElementById('btnHeatmap');
-
-  [btnK, btnG, btnH].forEach(b => { b.className = 'px-3 py-2 rounded-lg text-sm font-medium bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10'; });
-  const active = view==='kanban'?btnK:view==='gantt'?btnG:btnH;
-  active.className = 'px-3 py-2 rounded-lg text-sm font-medium bg-neon-cyan/10 text-neon-cyan border border-neon-cyan/30';
-
-  if (view === 'gantt') renderGantt();
-  if (view === 'heatmap') renderHeatmap();
+  document.getElementById('kanbanView').classList.toggle('hidden', view!=='kanban');
+  document.getElementById('ganttView').classList.toggle('hidden', view!=='gantt');
+  document.getElementById('heatmapView').classList.toggle('hidden', view!=='heatmap');
+  ['btnKanban','btnGantt','btnHeatmap'].forEach(id => { document.getElementById(id).className = 'px-3 py-2 rounded-lg text-sm font-medium bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10'; });
+  const btn = view==='kanban'?'btnKanban':view==='gantt'?'btnGantt':'btnHeatmap';
+  document.getElementById(btn).className = 'px-3 py-2 rounded-lg text-sm font-medium bg-neon-cyan/10 text-neon-cyan border border-neon-cyan/30';
+  if(view==='gantt') renderGantt(); if(view==='heatmap') renderHeatmap();
 }
 
-function selectProject(id) {
-  currentProjectId = id;
-  renderAll();
-}
-
-// ============ RENDER ALL ============
-
-function renderAll() {
-  renderSummary();
-  renderProjectTabs();
-  renderKanban();
-}
-
-// Initialize
+function selectProject(id) { currentProjectId=id; renderAll(); }
+function renderAll() { renderSummary(); renderProjectTabs(); renderKanban(); }
 renderAll();
 </script>
 </body>
