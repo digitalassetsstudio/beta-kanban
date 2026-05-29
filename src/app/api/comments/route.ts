@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { isAuthenticated } from '@/lib/auth'
+import { getCorsHeaders, corsOptionsResponse } from '@/lib/cors'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-}
-
-export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders })
+export async function OPTIONS(req: NextRequest) {
+  return corsOptionsResponse(req)
 }
 
 export async function GET(req: NextRequest) {
+  const corsHeaders = getCorsHeaders(req)
+
+  // Auth check
+  if (!isAuthenticated(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders })
+  }
+
   try {
     const { searchParams } = new URL(req.url)
     const taskId = searchParams.get('task_id')
@@ -33,6 +36,13 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const corsHeaders = getCorsHeaders(req)
+
+  // Auth check
+  if (!isAuthenticated(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders })
+  }
+
   try {
     const body = await req.json()
     const { task_id, agent_name, text, is_system } = body

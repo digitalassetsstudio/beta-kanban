@@ -64,7 +64,7 @@ const COLUMNS = ['Backlog', 'Todo', 'Doing', 'Review', 'Done']
 const COL_COLORS: Record<string, string> = { Backlog: '#6b7280', Todo: '#3b82f6', Doing: '#f59e0b', Review: '#a855f7', Done: '#22c55e' }
 const AGENTS = ['Amun', 'Thoth', 'Ptah', 'Shisat', 'Aset']
 const AGENT_COLORS: Record<string, string> = { Amun: '#a855f7', Thoth: '#00f0ff', Ptah: '#f59e0b', Shisat: '#22c55e', Aset: '#ec4899' }
-const PASSWORD = 'kanban2026'
+// Password is verified server-side via /api/auth — never stored in client bundle
 
 const ZONES: Record<string, { icon: string; color: string; label: string }> = {
   research: { icon: '🔬', color: '#a855f7', label: 'Research' },
@@ -100,18 +100,31 @@ function timeAgo(dateStr: string) {
 function PasswordGate({ onAuth }: { onAuth: () => void }) {
   const [input, setInput] = useState('')
   const [error, setError] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { inputRef.current?.focus() }, [])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (input === PASSWORD) {
-      sessionStorage.setItem('kanban-auth', 'true')
-      onAuth()
-    } else {
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: input }),
+      })
+      if (res.ok) {
+        onAuth()
+      } else {
+        setError(true)
+        setTimeout(() => setError(false), 2000)
+      }
+    } catch {
       setError(true)
       setTimeout(() => setError(false), 2000)
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -136,9 +149,10 @@ function PasswordGate({ onAuth }: { onAuth: () => void }) {
           {error && <p className="text-red-400 text-sm text-center animate-pulse">Incorrect password</p>}
           <button
             type="submit"
-            className="w-full py-3 rounded-xl bg-gradient-to-r from-[#00f0ff] to-[#a855f7] text-[#0a0a0f] font-bold text-sm hover:shadow-[0_0_25px_rgba(0,240,255,0.4)] transition-all"
+            disabled={submitting}
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-[#00f0ff] to-[#a855f7] text-[#0a0a0f] font-bold text-sm hover:shadow-[0_0_25px_rgba(0,240,255,0.4)] transition-all disabled:opacity-50"
           >
-            Access Dashboard
+            {submitting ? 'Verifying...' : 'Access Dashboard'}
           </button>
         </form>
       </div>
@@ -193,10 +207,12 @@ export default function KanbanDashboard() {
   const [showNotifications, setShowNotifications] = useState(false)
   const notifRef = useRef<HTMLDivElement>(null)
 
-  // Auth check
+  // Auth check — verify server-side session cookie
   useEffect(() => {
-    const isAuth = sessionStorage.getItem('kanban-auth') === 'true'
-    if (isAuth) setAuthed(true)
+    fetch('/api/auth')
+      .then(res => res.ok ? res.json() : { authenticated: false })
+      .then(data => { if (data.authenticated) setAuthed(true) })
+      .catch(() => {})
   }, [])
 
   // Fetch projects from API
@@ -593,7 +609,7 @@ export default function KanbanDashboard() {
             { label: 'Total Projects', value: projects.length, icon: '📊', gradient: 'from-cyan-500/20 to-blue-500/10', border: 'border-cyan-500/20' },
             { label: 'Total Tasks', value: totalTasks, icon: '📝', gradient: 'from-purple-500/20 to-pink-500/10', border: 'border-purple-500/20' },
             { label: 'Completion', value: completionPct + '%', icon: '🎯', gradient: 'from-green-500/20 to-emerald-500/10', border: 'border-green-500/20' },
-            { label: 'Revenue Potential', value: '$780k+', icon: '💰', gradient: 'from-yellow-500/20 to-orange-500/10', border: 'border-yellow-500/20' },
+            { label: 'Revenue Potential', value: '---', icon: '💰', gradient: 'from-yellow-500/20 to-orange-500/10', border: 'border-yellow-500/20' },
             { label: 'Due This Week', value: upcomingDeadlines, icon: '⏰', gradient: 'from-orange-500/20 to-red-500/10', border: 'border-orange-500/20' },
             { label: 'Blocked Items', value: blockedItems, icon: '🚫', gradient: 'from-red-500/20 to-pink-500/10', border: 'border-red-500/20' }
           ].map(c => (
@@ -685,7 +701,7 @@ export default function KanbanDashboard() {
           {/* GANTT VIEW */}
           {view === 'gantt' && (
             <div className="bg-[#12121a]/50 border border-white/5 rounded-2xl p-6">
-              <h2 className="text-lg font-bold text-[#00f0ff] mb-6">Timeline View — Ptah Evolution & Shisat Upgrade</h2>
+              <h2 className="text-lg font-bold text-[#00f0ff] mb-6">Timeline View</h2>
               <div className="relative">
                 <div className="flex mb-4 border-b border-white/5 pb-2 overflow-x-auto">
                   {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun'].map((m, i) => (

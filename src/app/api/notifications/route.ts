@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { isAuthenticated } from '@/lib/auth'
+import { getCorsHeaders, corsOptionsResponse } from '@/lib/cors'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-}
-
-export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders })
+export async function OPTIONS(req: NextRequest) {
+  return corsOptionsResponse(req)
 }
 
 export async function GET(req: NextRequest) {
+  const corsHeaders = getCorsHeaders(req)
+
+  // Auth check
+  if (!isAuthenticated(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders })
+  }
+
   try {
     const { searchParams } = new URL(req.url)
     const unreadOnly = searchParams.get('unread') === 'true'
@@ -29,12 +32,28 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const corsHeaders = getCorsHeaders(req)
+
+  // Auth check — but allow internal agent posts with API key header
+  const agentKey = req.headers.get('X-Agent-Key')
+  const agentKeys = (process.env.AGENT_API_KEYS || '').split(',').map(k => k.trim()).filter(Boolean)
+
+  if (!isAuthenticated(req) && !agentKeys.includes(agentKey || '')) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders })
+  }
+
   try {
     const body = await req.json()
     const { zone, title, body: notifBody, source, taskId, projectId } = body
 
     if (!zone || !title || !notifBody || !source) {
       return NextResponse.json({ error: 'zone, title, body, and source are required' }, { status: 400, headers: corsHeaders })
+    }
+
+    // Validate zone
+    const validZones = ['research', 'marketing', 'sales', 'ops']
+    if (!validZones.includes(zone)) {
+      return NextResponse.json({ error: `Invalid zone. Must be one of: ${validZones.join(', ')}` }, { status: 400, headers: corsHeaders })
     }
 
     const notification = await db.notification.create({

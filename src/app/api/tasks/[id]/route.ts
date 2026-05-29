@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-}
+import { isAuthenticated } from '@/lib/auth'
+import { getCorsHeaders, corsOptionsResponse } from '@/lib/cors'
 
 // Zone mapping based on project name
 function getZoneForProject(projectName: string): string {
@@ -17,11 +13,18 @@ function getZoneForProject(projectName: string): string {
   return 'ops'
 }
 
-export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders })
+export async function OPTIONS(req: NextRequest) {
+  return corsOptionsResponse(req)
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const corsHeaders = getCorsHeaders(req)
+
+  // Auth check
+  if (!isAuthenticated(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders })
+  }
+
   try {
     const { id } = await params
     const body = await req.json()
@@ -131,6 +134,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const corsHeaders = getCorsHeaders(req)
+
+  // Auth check
+  if (!isAuthenticated(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders })
+  }
+
   try {
     const { id } = await params
 

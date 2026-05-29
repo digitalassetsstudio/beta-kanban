@@ -1,0 +1,43 @@
+# ============ SOVEREIGN KANBAN — DOCKER COMPOSE ============
+# Deploys Kanban Command on VPS with Tailscale-only access
+#
+# Usage:
+#   docker compose up -d          # Start in background
+#   docker compose logs -f        # View logs
+#   docker compose down           # Stop
+#
+# First-time setup:
+#   1. Copy .env.example to .env and fill in values
+#   2. docker compose run --rm kanban npx prisma db push  # Create DB schema
+#   3. docker compose run --rm kanban npx prisma db seed   # Seed demo data (optional)
+#   4. docker compose up -d
+
+services:
+  kanban:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: kanban-command
+    restart: unless-stopped
+    ports:
+      # Bind to Tailscale IP only — NOT 0.0.0.0
+      # Replace 100.x.x.x with your VPS Tailscale IP
+      - "100.x.x.x:3000:3000"
+    environment:
+      - DATABASE_URL=file:/app/data/kanban.db
+      - KANBAN_PASSWORD=${KANBAN_PASSWORD:-kanban2026}
+      - NODE_ENV=production
+      - AGENT_API_KEYS=${AGENT_API_KEYS:-}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
+    volumes:
+      - kanban-data:/app/data
+    networks:
+      - tailscale
+
+volumes:
+  kanban-data:
+    driver: local
+
+networks:
+  tailscale:
+    driver: bridge

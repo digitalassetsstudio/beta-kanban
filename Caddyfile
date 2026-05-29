@@ -1,23 +1,22 @@
+# ============ SOVEREIGN KANBAN — CADDY REVERSE PROXY ============
+# For VPS deployment with Tailscale-only access
+# Binds to Tailscale IP only (replace 100.x.x.x with your IP)
+
 :81 {
-	@transform_port_query {
-		query XTransformPort=*
-	}
+        # Security headers
+        header {
+                X-Frame-Options DENY
+                X-Content-Type-Options nosniff
+                Referrer-Policy strict-origin-when-cross-origin
+                -Server
+        }
 
-	handle @transform_port_query {
-		reverse_proxy localhost:{query.XTransformPort} {
-			header_up Host {host}
-			header_up X-Forwarded-For {remote_host}
-			header_up X-Forwarded-Proto {scheme}
-			header_up X-Real-IP {remote_host}
-		}
-	}
-
-	handle {
-		reverse_proxy localhost:3000 {
-			header_up Host {host}
-			header_up X-Forwarded-For {remote_host}
-			header_up X-Forwarded-Proto {scheme}
-			header_up X-Real-IP {remote_host}
-		}
-	}
+        handle {
+                reverse_proxy localhost:3000 {
+                        header_up Host {host}
+                        header_up X-Forwarded-For {remote_host}
+                        header_up X-Forwarded-Proto {scheme}
+                        header_up X-Real-IP {remote_host}
+                }
+        }
 }
