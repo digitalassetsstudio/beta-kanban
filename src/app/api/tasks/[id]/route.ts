@@ -7,6 +7,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type',
 }
 
+// Zone mapping based on project name
+function getZoneForProject(projectName: string): string {
+  const name = projectName.toLowerCase()
+  if (name.includes('legitcheck') || name.includes('scitrades')) return 'research'
+  if (name.includes('ai quick wins') || name.includes('ai auto saas')) return 'marketing'
+  if (name.includes('ptah evolution') || name.includes('shisat upgrade')) return 'sales'
+  if (name.includes('my distant relative')) return 'research'
+  return 'ops'
+}
+
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders })
 }
@@ -17,7 +27,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const body = await req.json()
 
     // Get current task to compare changes
-    const currentTask = await db.task.findUnique({ where: { id } })
+    const currentTask = await db.task.findUnique({
+      where: { id },
+      include: { project: true },
+    })
     if (!currentTask) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404, headers: corsHeaders })
     }
@@ -38,7 +51,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       include: { comments: { orderBy: { createdAt: 'asc' } } },
     })
 
-    // Auto-comment: column change
+    const zone = getZoneForProject(currentTask.project.name)
+
+    // Auto-comment + Notification: column change
     if (body.column !== undefined && body.column !== currentTask.column) {
       await db.comment.create({
         data: {
@@ -48,9 +63,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           isSystem: true,
         },
       })
+
+      await db.notification.create({
+        data: {
+          zone,
+          title: `Task Moved: ${currentTask.title}`,
+          body: `Moved from ${currentTask.column} to ${body.column}`,
+          source: 'System',
+          taskId: id,
+          projectId: currentTask.projectId,
+        },
+      })
     }
 
-    // Auto-comment: assignee change
+    // Auto-comment + Notification: assignee change
     if (body.assignee !== undefined) {
       const oldAssignee = currentTask.assignee || 'Unassigned'
       const newAssignee = body.assignee || 'Unassigned'
@@ -63,7 +89,32 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             isSystem: true,
           },
         })
+
+        await db.notification.create({
+          data: {
+            zone,
+            title: `Assignee Changed: ${currentTask.title}`,
+            body: `Changed from ${oldAssignee} to ${newAssignee}`,
+            source: 'System',
+            taskId: id,
+            projectId: currentTask.projectId,
+          },
+        })
       }
+    }
+
+    // Notification: health changed to Red
+    if (body.health !== undefined && body.health === 'Red' && currentTask.health !== 'Red') {
+      await db.notification.create({
+        data: {
+          zone: 'sales', // health issues affect revenue/pipeline
+          title: `Health Alert: ${currentTask.title}`,
+          body: `Health changed from ${currentTask.health} to Red`,
+          source: 'System',
+          taskId: id,
+          projectId: currentTask.projectId,
+        },
+      })
     }
 
     // Re-fetch with comments to include the new auto-comments

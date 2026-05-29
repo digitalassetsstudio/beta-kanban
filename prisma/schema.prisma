@@ -45,3 +45,15 @@ model Comment {
   isSystem   Boolean  @default(false)
   createdAt  DateTime @default(now())
 }
+
+model Notification {
+  id         String   @id @default(cuid())
+  zone       String   // "research", "marketing", "sales", "ops"
+  title      String
+  body       String
+  source     String   // "Ptah", "Shisat", "Aset", "System", etc.
+  taskId     String?
+  projectId  String?
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}

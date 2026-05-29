@@ -47,12 +47,34 @@ interface Project {
   updatedAt: string
 }
 
+interface NotificationItem {
+  id: string
+  zone: 'research' | 'marketing' | 'sales' | 'ops'
+  title: string
+  body: string
+  source: string
+  taskId: string | null
+  projectId: string | null
+  read: boolean
+  createdAt: string
+}
+
 // ============ CONSTANTS ============
 const COLUMNS = ['Backlog', 'Todo', 'Doing', 'Review', 'Done']
 const COL_COLORS: Record<string, string> = { Backlog: '#6b7280', Todo: '#3b82f6', Doing: '#f59e0b', Review: '#a855f7', Done: '#22c55e' }
 const AGENTS = ['Amun', 'Thoth', 'Ptah', 'Shisat', 'Aset']
 const AGENT_COLORS: Record<string, string> = { Amun: '#a855f7', Thoth: '#00f0ff', Ptah: '#f59e0b', Shisat: '#22c55e', Aset: '#ec4899' }
 const PASSWORD = 'kanban2026'
+
+const ZONES: Record<string, { icon: string; color: string; label: string }> = {
+  research: { icon: '🔬', color: '#a855f7', label: 'Research' },
+  marketing: { icon: '📢', color: '#00f0ff', label: 'Marketing' },
+  sales: { icon: '💰', color: '#22c55e', label: 'Sales' },
+  ops: { icon: '📋', color: '#6b7280', label: 'Ops' },
+}
+
+// Zone priority order: sales > marketing > research > ops
+const ZONE_PRIORITY = ['sales', 'marketing', 'research', 'ops']
 
 // ============ HELPERS ============
 function healthColor(h: string) { return h === 'Green' ? '#22c55e' : h === 'Yellow' ? '#eab308' : '#ef4444' }
@@ -167,6 +189,9 @@ export default function KanbanDashboard() {
   const [commentsLoading, setCommentsLoading] = useState(false)
   const [sideAssignee, setSideAssignee] = useState<string>('')
   const fetchCountRef = useRef(0)
+  const [notifications, setNotifications] = useState<NotificationItem[]>([])
+  const [showNotifications, setShowNotifications] = useState(false)
+  const notifRef = useRef<HTMLDivElement>(null)
 
   // Auth check
   useEffect(() => {
@@ -197,6 +222,40 @@ export default function KanbanDashboard() {
   useEffect(() => {
     if (authed) fetchProjects()
   }, [authed, fetchProjects])
+
+  // Fetch notifications
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const res = await fetch('/api/notifications')
+      if (res.ok) {
+        const data = await res.json()
+        setNotifications(data)
+      }
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err)
+    }
+  }, [])
+
+  // Fetch notifications on auth + poll every 60s
+  useEffect(() => {
+    if (!authed) return
+    fetchNotifications()
+    const interval = setInterval(fetchNotifications, 60000)
+    return () => clearInterval(interval)
+  }, [authed, fetchNotifications])
+
+  // Close notification dropdown on click outside
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotifications(false)
+      }
+    }
+    if (showNotifications) {
+      document.addEventListener('mousedown', handleClick)
+      return () => document.removeEventListener('mousedown', handleClick)
+    }
+  }, [showNotifications])
 
   // Fetch comments for side panel
   useEffect(() => {
@@ -256,6 +315,7 @@ export default function KanbanDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ column: targetColumn }),
       })
+      await fetchNotifications()
     } catch (err) {
       console.error('Failed to move task:', err)
     }
@@ -273,10 +333,11 @@ export default function KanbanDashboard() {
     try {
       await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' })
       await fetchProjects()
+      await fetchNotifications()
     } catch (err) {
       console.error('Failed to delete task:', err)
     }
-  }, [fetchProjects])
+  }, [fetchProjects, fetchNotifications])
 
   // Add project
   const addProject = useCallback(async () => {
@@ -294,11 +355,12 @@ export default function KanbanDashboard() {
         setNewProjName('')
         setNewProjDesc('')
         await fetchProjects()
+        await fetchNotifications()
       }
     } catch (err) {
       console.error('Failed to add project:', err)
     }
-  }, [newProjName, newProjDesc, newProjStage, fetchProjects])
+  }, [newProjName, newProjDesc, newProjStage, fetchProjects, fetchNotifications])
 
   // Add task
   const addTask = useCallback(async () => {
@@ -324,10 +386,11 @@ export default function KanbanDashboard() {
       setNewTaskDesc('')
       setNewTaskAssignee('')
       await fetchProjects()
+      await fetchNotifications()
     } catch (err) {
       console.error('Failed to add task:', err)
     }
-  }, [newTaskTitle, newTaskDesc, newTaskHealth, newTaskDue, newTaskRisk, newTaskRevenue, addTaskColumn, currentProjectId, newTaskAssignee, fetchProjects])
+  }, [newTaskTitle, newTaskDesc, newTaskHealth, newTaskDue, newTaskRisk, newTaskRevenue, addTaskColumn, currentProjectId, newTaskAssignee, fetchProjects, fetchNotifications])
 
   // Post comment
   const postComment = useCallback(async () => {
@@ -348,10 +411,11 @@ export default function KanbanDashboard() {
       const res = await fetch(`/api/comments?task_id=${sidePanelTask.taskId}`)
       if (res.ok) setComments(await res.json())
       await fetchProjects()
+      await fetchNotifications()
     } catch (err) {
       console.error('Failed to post comment:', err)
     }
-  }, [sidePanelTask, commentText, commentAgent, fetchProjects])
+  }, [sidePanelTask, commentText, commentAgent, fetchProjects, fetchNotifications])
 
   // Change assignee
   const changeAssignee = useCallback(async (taskId: string, newAssignee: string) => {
@@ -362,6 +426,7 @@ export default function KanbanDashboard() {
         body: JSON.stringify({ assignee: newAssignee || null }),
       })
       await fetchProjects()
+      await fetchNotifications()
       // Refetch comments
       if (sidePanelTask) {
         const res = await fetch(`/api/comments?task_id=${sidePanelTask.taskId}`)
@@ -370,7 +435,7 @@ export default function KanbanDashboard() {
     } catch (err) {
       console.error('Failed to change assignee:', err)
     }
-  }, [fetchProjects, sidePanelTask])
+  }, [fetchProjects, fetchNotifications, sidePanelTask])
 
   // Gantt helpers
   const globalStart = new Date('2026-01-01').getTime()
@@ -417,6 +482,96 @@ export default function KanbanDashboard() {
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#00f0ff] to-[#a855f7] flex items-center justify-center font-bold text-sm text-[#0a0a0f]">K</div>
             <span className="text-lg font-bold bg-gradient-to-r from-[#00f0ff] to-[#a855f7] bg-clip-text text-transparent hidden sm:inline">Kanban Command</span>
+          </div>
+          {/* Notification Bell */}
+          <div className="relative" ref={notifRef}>
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="relative p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
+              aria-label="Notifications"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-300" style={notifications.some(n => !n.read) ? { filter: `drop-shadow(0 0 6px ${ZONE_PRIORITY.find(z => notifications.some(n => !n.read && n.zone === z)) ? ZONES[ZONE_PRIORITY.find(z => notifications.some(n => !n.read && n.zone === z)) || 'ops'].color : '#6b7280'})` } : undefined}>
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+              {notifications.some(n => !n.read) && (() => {
+                const topZone = ZONE_PRIORITY.find(z => notifications.some(n => !n.read && n.zone === z))
+                const glowColor = topZone ? ZONES[topZone].color : '#6b7280'
+                return (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold text-white px-1" style={{ background: glowColor, boxShadow: `0 0 8px ${glowColor}` }}>
+                    {notifications.filter(n => !n.read).length}
+                  </span>
+                )
+              })()}
+            </button>
+            {/* Notification Dropdown */}
+            {showNotifications && (
+              <div className="absolute right-0 top-full mt-2 bg-[#12121a] border border-white/10 rounded-xl shadow-2xl z-[60] w-[calc(100vw-2rem)] sm:w-[380px] max-h-[400px] flex flex-col overflow-hidden">
+                <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between flex-shrink-0">
+                  <h3 className="text-sm font-bold text-white">Notifications</h3>
+                  <span className="text-[10px] text-gray-500">{notifications.filter(n => !n.read).length} unread</span>
+                </div>
+                <div className="overflow-y-auto flex-1" style={{ scrollbarWidth: 'thin', scrollbarColor: '#333 transparent' }}>
+                  {notifications.length === 0 ? (
+                    <div className="px-4 py-8 text-center text-gray-600 text-xs">No notifications yet</div>
+                  ) : (
+                    notifications.map(n => {
+                      const zone = ZONES[n.zone] || ZONES.ops
+                      return (
+                        <div
+                          key={n.id}
+                          onClick={async () => {
+                            // Mark as read
+                            if (!n.read) {
+                              await fetch(`/api/notifications/${n.id}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ read: true }),
+                              })
+                              await fetchNotifications()
+                            }
+                            // Navigate
+                            if (n.projectId) setCurrentProjectId(n.projectId)
+                            if (n.taskId && n.projectId) setSidePanelTask({ taskId: n.taskId, projectId: n.projectId })
+                            setShowNotifications(false)
+                          }}
+                          className="px-4 py-3 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors flex items-start gap-3"
+                          style={{ borderLeft: `2px solid ${zone.color}` }}
+                        >
+                          <span className="text-base flex-shrink-0 mt-0.5">{zone.icon}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <span className="text-xs font-semibold text-white truncate">{n.title}</span>
+                              {!n.read && <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />}
+                            </div>
+                            <p className="text-[11px] text-gray-400 line-clamp-2 mb-1">{n.body}</p>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[9px] px-1.5 py-0.5 rounded border font-medium" style={{
+                                background: `${AGENT_COLORS[n.source] || '#6b7280'}15`,
+                                color: AGENT_COLORS[n.source] || '#6b7280',
+                                borderColor: `${AGENT_COLORS[n.source] || '#6b7280'}40`
+                              }}>{n.source}</span>
+                              <span className="text-[9px] text-gray-600">{timeAgo(n.createdAt)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+                <div className="px-4 py-2 border-t border-white/5 flex-shrink-0">
+                  <button
+                    onClick={async () => {
+                      await fetch('/api/notifications/mark-all', { method: 'POST' })
+                      await fetchNotifications()
+                    }}
+                    className="w-full py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 text-xs font-medium transition"
+                  >
+                    Mark all as read
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
             <button onClick={() => setShowAddProject(true)} className="px-3 py-2 rounded-lg bg-[#00f0ff]/10 border border-[#00f0ff]/30 text-[#00f0ff] text-sm font-medium hover:bg-[#00f0ff]/20 transition-all flex items-center gap-1.5">
@@ -721,6 +876,7 @@ export default function KanbanDashboard() {
                           body: JSON.stringify({ column: col }),
                         })
                         await fetchProjects()
+                        await fetchNotifications()
                       }}
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
                         sideTask.column === col
@@ -895,3 +1051,4 @@ export default function KanbanDashboard() {
     </div>
   )
 }
+
